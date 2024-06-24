@@ -107,7 +107,7 @@ const handleMove = (source, target) => {
   // Check for game-ending conditions
   if (chess.in_checkmate()) {
     const winner = chess.turn() === "w" ? "Black" : "White";
-    createCelebrationRain();
+    socket.emit(createCelebrationRain());
     showPopup(`Hooray 🥳🥳!! ${winner} wins by checkmate!`);
   } else if (chess.in_stalemate()) {
     showPopup("Stalemate! It's a draw.");
@@ -178,6 +178,28 @@ const displayPopup = (message) => {
     popup.style.display = "none";
   }, 3000); // Hide after 2 seconds
 };
+
+//----------
+socket.on("gameOver", (data) => {
+  if (data.result === "checkmate") {
+    const winner = data.winner;
+    createCelebrationRain();
+    showPopup(`Hooray 🥳🥳!! ${winner} wins by checkmate!`);
+  } else if (data.result === "stalemate") {
+    showPopup("Stalemate! It's a draw.");
+  } else if (data.result === "draw") {
+    showPopup("Draw!");
+  } else if (data.result == "disconnection") {
+    const winner = data.winner;
+    createCelebrationRain();
+    showPopup(`Hooray 🥳🥳!! ${winner} wins ...opponent left the match`);
+  }
+});
+
+socket.on("reset", (position) => {
+  chess.load(position);
+  board.position(position);
+});
 
 const createCelebrationRain = () => {
   const celebrationContainer = document.createElement("div");

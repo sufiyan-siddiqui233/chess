@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
-const chess = new Chess();
+let chess = new Chess();
 let players = {};
 let spectators = [];
 
@@ -22,14 +22,6 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/", function (req, res) {
   res.render("index");
 });
-
-// app.post("/submit", function (req, res) {
-//   res.render("homepage");
-// });
-
-// app.get("/game", function (req, res) {
-//   res.render("index");
-// });
 
 // Socket.io events
 io.on("connection", function (socket) {
@@ -57,11 +49,13 @@ io.on("connection", function (socket) {
     console.log(`Socket ${socket.id} disconnected`);
 
     if (socket.id === players.white) {
-      delete players.white;
       io.emit("showPopup", "White player has disconnected");
+      io.emit("gameOver", { result: "disconnection", winner: "Black" });
+      resetGame();
     } else if (socket.id === players.black) {
-      delete players.black;
       io.emit("showPopup", "Black player has disconnected");
+      io.emit("gameOver", { result: "disconnection", winner: "White" });
+      resetGame();
     } else {
       spectators = spectators.filter((id) => id !== socket.id);
     }
@@ -80,13 +74,20 @@ io.on("connection", function (socket) {
         io.emit("boardState", chess.fen());
 
         // Check for game-ending conditions
-        if (chess.in_checkmate()) {
+        if (chess.isCheckmate()) {
           const winner = chess.turn() === "w" ? "Black" : "White";
-          io.emit("showPopup", `${winner} wins by checkmate!`);
-        } else if (chess.in_stalemate()) {
-          io.emit("showPopup", "Stalemate! It's a draw.");
+
+          // io.emit("showPopup", `${winner} wins by checkmate!`);
+          io.emit("gameOver", { result: "checkmate", winner: winner });
+          resetGame();
+        } else if (chess.isStalemate()) {
+          // io.emit("showPopup", "Stalemate! It's a draw.");
+          io.emit("gameOver", { result: "stalemate" });
+          resetGame();
         } else if (chess.in_draw()) {
-          io.emit("showPopup", "Draw!");
+          // io.emit("showPopup", "Draw!");
+          io.emit("gameOver", { result: "Draw" });
+          resetGame();
         }
       } else {
         console.log("Invalid Move", move);
@@ -97,6 +98,17 @@ io.on("connection", function (socket) {
       socket.emit("InvalidMove", move);
     }
   });
+
+  function resetGame() {
+    chess = new Chess();
+    io.emit("reset", chess.fen());
+    // Reset players and spectators if needed
+    players = {
+      white: null,
+      black: null,
+    };
+    spectators = [];
+  }
 
   // Handle initial board state
   socket.emit("boardState", chess.fen());
